@@ -1,4 +1,4 @@
-# DocuMind Frontend
+# IntelliExact
 
 A beautiful, modern UI for document intelligence and AI-powered data extraction.
 
