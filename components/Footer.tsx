@@ -11,10 +11,10 @@ export default function Footer() {
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
                 <FileText className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-white">DocuMind</span>
+              <span className="text-xl font-bold text-white">IntelliExtract</span>
             </div>
             <p className="text-sm text-gray-400">
-              AI-powered document intelligence for modern businesses.
+              AI-powered document extraction for modern businesses.
             </p>
             <div className="flex space-x-4 mt-4">
               <a href="#" className="text-gray-400 hover:text-white transition">
@@ -61,7 +61,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-12 pt-8 text-center text-sm text-gray-400">
-          <p>&copy; 2025 DocuMind. All rights reserved.</p>
+          <p>&copy; 2025 IntelliExtract. All rights reserved.</p>
         </div>
       </div>
     </footer>

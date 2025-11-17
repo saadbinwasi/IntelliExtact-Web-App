@@ -9,7 +9,7 @@ export default function CTA() {
           Ready to Transform Your Documents?
         </h2>
         <p className="text-xl text-blue-100 mb-8">
-          Join thousands of businesses using DocuMind to automate document processing
+          Transform your document processing workflow with intelligent data extraction
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
           <Link href="/dashboard">

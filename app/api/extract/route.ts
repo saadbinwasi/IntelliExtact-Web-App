@@ -219,6 +219,13 @@ export async function POST(request: NextRequest) {
           throw new Error('Document appears to be empty or could not be read.')
         }
 
+        // Limit document text size to prevent timeouts (Ollama can be slow with large documents)
+        // Use first 8000 chars for faster processing
+        const maxTextLength = 8000
+        const truncatedText = documentText.length > maxTextLength 
+          ? documentText.substring(0, maxTextLength) + '\n\n[Document truncated for faster processing...]'
+          : documentText
+
         // Build extraction prompt with better instructions
         let extractionPrompt = `You are a document extraction expert. Extract ALL structured data from the following document and return it as valid JSON only.
 
@@ -235,32 +242,50 @@ ${autoSchema ? 'Automatically detect the document type and extract all relevant 
 ${template ? `Use this structure as a guide: ${template}` : ''}
 
 Document content:
-${documentText.substring(0, 12000)}`
+${truncatedText}`
 
         console.log('Starting Ollama extraction:', { 
           model: modelName,
           fileName: file.name,
-          ollamaUrl: ollamaBaseUrl
+          ollamaUrl: ollamaBaseUrl,
+          textLength: truncatedText.length,
+          originalLength: documentText.length
         })
 
-        // Call Ollama API
+        // Call Ollama API with timeout
         const ollamaUrl = `${ollamaBaseUrl}/api/generate`
         
-        const ollamaResponse = await fetch(ollamaUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: modelName,
-            prompt: extractionPrompt,
-            stream: false,
-            options: {
-              temperature: 0.1,
-              num_predict: 4000,
-            }
-          }),
-        })
+        // Create AbortController for timeout (2 minutes for Ollama)
+        const ollamaTimeout = 120000 // 2 minutes
+        const ollamaController = new AbortController()
+        const ollamaTimeoutId = setTimeout(() => ollamaController.abort(), ollamaTimeout)
+        
+        let ollamaResponse
+        try {
+          ollamaResponse = await fetch(ollamaUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal: ollamaController.signal,
+            body: JSON.stringify({
+              model: modelName,
+              prompt: extractionPrompt,
+              stream: false,
+              options: {
+                temperature: 0.1,
+                num_predict: 2000, // Reduced from 4000 for faster processing
+              }
+            }),
+          })
+          clearTimeout(ollamaTimeoutId)
+        } catch (fetchError: any) {
+          clearTimeout(ollamaTimeoutId)
+          if (fetchError.name === 'AbortError' || fetchError.code === 'UND_ERR_HEADERS_TIMEOUT') {
+            throw new Error(`Ollama request timed out after 2 minutes. The document may be too large or Ollama is too slow. Try using Gemini or OpenAI models instead, or use a smaller document.`)
+          }
+          throw fetchError
+        }
 
         if (!ollamaResponse.ok) {
           const errorData = await ollamaResponse.json().catch(() => ({}))
@@ -892,6 +917,28 @@ ${documentText.substring(0, 12000)}`
 
       const processingTime = Date.now() - startTime
 
+      // Update document status to completed in database (if documentId provided)
+      if (documentId) {
+        try {
+          const { error: updateStatusError } = await supabase
+            .from('documents')
+            .update({
+              status: 'completed',
+              extracted_data: result.data || (result.markdown ? { text: result.markdown } : result),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', documentId)
+          
+          if (updateStatusError) {
+            console.error('Error updating document status to completed:', updateStatusError)
+            // Don't fail the request, just log the error
+          }
+        } catch (statusUpdateErr) {
+          console.error('Exception updating document status:', statusUpdateErr)
+          // Don't fail the request
+        }
+      }
+
       // Clean up: delete temporary file
       try {
         await unlink(filePath)
@@ -917,6 +964,25 @@ ${documentText.substring(0, 12000)}`
         await unlink(filePath)
       } catch (error) {
         console.error('Error deleting temp file:', error)
+      }
+
+      // Update document status to failed in database (if documentId provided)
+      if (documentId) {
+        try {
+          const { error: updateStatusError } = await supabase
+            .from('documents')
+            .update({
+              status: 'failed',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', documentId)
+          
+          if (updateStatusError) {
+            console.error('Error updating document status to failed:', updateStatusError)
+          }
+        } catch (statusUpdateErr) {
+          console.error('Exception updating document status to failed:', statusUpdateErr)
+        }
       }
 
       // Refund tokens if extraction failed (only if tokens were deducted)

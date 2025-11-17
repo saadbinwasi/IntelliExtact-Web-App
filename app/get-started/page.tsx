@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { createClient } from '@/lib/supabase/client'
-import { Upload, FileText, Settings, Brain, Loader2, CheckCircle, XCircle, Eye, ArrowRight, Coins, Lock } from 'lucide-react'
+import { Upload, FileText, Brain, Loader2, CheckCircle, XCircle, Eye, ArrowRight, Coins, Lock } from 'lucide-react'
 import ExtractedDataViewer from '@/components/ExtractedDataViewer'
 import AuthModal from '@/components/AuthModal'
 import { useAuth } from '@/contexts/AuthContext'
@@ -306,7 +306,8 @@ export default function GetStarted() {
       // Refresh user profile from context
       await refreshUser()
 
-      // Update document status to completed
+      // Note: Document status is already updated to 'completed' in the API route
+      // This is a backup update in case the API update failed
       const { error: updateError } = await supabase
         .from('documents')
         .update({
@@ -317,8 +318,8 @@ export default function GetStarted() {
         .eq('id', document.id)
 
       if (updateError) {
-        console.error('Error updating document:', updateError)
-        alert(`Warning: Document processed but failed to save to database: ${updateError.message}`)
+        console.error('Error updating document (backup update):', updateError)
+        // Don't show alert - API route should have already updated it
       }
 
       // Save extraction history
@@ -418,7 +419,7 @@ export default function GetStarted() {
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
             Get Started with
             <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              DocuMind
+              IntelliExtract
             </span>
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-6">
@@ -519,7 +520,7 @@ export default function GetStarted() {
         </div>
 
         {/* Processing Options */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className={`bg-white dark:bg-gray-800 rounded-xl p-6 border-2 transition ${
             selectedTemplate ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700'
           }`}>
@@ -543,24 +544,6 @@ export default function GetStarted() {
               <option value="bank_statement">Bank Statement</option>
               <option value="drivers_license_uk">Driver&apos;s License (UK)</option>
             </select>
-          </div>
-
-          <div className={`bg-white dark:bg-gray-800 rounded-xl p-6 border-2 transition ${
-            !selectedTemplate && !useAutoSchema ? 'border-blue-500' : 'border-gray-200 dark:border-gray-700'
-          }`}>
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center mb-3">
-              <Settings className="w-6 h-6 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Custom Schema</h3>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-              Define your own extraction schema (Coming soon)
-            </p>
-            <button 
-              disabled
-              className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-500 rounded-lg cursor-not-allowed"
-            >
-              Coming Soon
-            </button>
           </div>
 
           <div className={`bg-white dark:bg-gray-800 rounded-xl p-6 border-2 transition ${

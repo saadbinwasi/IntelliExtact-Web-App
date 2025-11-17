@@ -11,11 +11,11 @@ export default function Pricing() {
   const plans = [
     {
       name: 'Free',
-      price: '$0',
-      period: 'forever',
+      price: 'Free',
+      period: '',
       tokens: 20,
       tokensPerMonth: 20,
-      description: 'Perfect for trying out DocuMind',
+      description: 'Perfect for trying out IntelliExtract',
       features: [
         '20 free tokens on signup',
         '10 tokens per extraction',
@@ -152,11 +152,13 @@ export default function Pricing() {
                   }`}>
                     {plan.price}
                   </span>
-                  <span className={`text-lg ml-2 ${
-                    plan.highlighted ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {plan.period}
-                  </span>
+                  {plan.period && (
+                    <span className={`text-lg ml-2 ${
+                      plan.highlighted ? 'text-blue-100' : 'text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {plan.period}
+                    </span>
+                  )}
                 </div>
                 <div className={`flex items-center space-x-2 px-4 py-2 rounded-lg ${
                   plan.highlighted 

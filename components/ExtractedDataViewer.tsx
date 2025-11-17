@@ -88,30 +88,115 @@ export default function ExtractedDataViewer({ data, fileName }: ExtractedDataVie
     }
 
     // Generic CSV export for other data types
-    const flattenObject = (obj: any, prefix = ''): any[] => {
-      const rows: any[] = []
-      for (const key in obj) {
-        const value = obj[key]
-        const newKey = prefix ? `${prefix}.${key}` : key
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-          rows.push(...flattenObject(value, newKey))
-        } else if (Array.isArray(value)) {
-          value.forEach((item, index) => {
-            if (typeof item === 'object') {
-              rows.push(...flattenObject(item, `${newKey}[${index}]`))
-            } else {
-              rows.push({ key: `${newKey}[${index}]`, value: item })
-            }
-          })
-        } else {
-          rows.push({ key: newKey, value: value })
-        }
-      }
-      return rows
+    // Clean field names: remove "this.", convert camelCase to Title Case
+    const cleanFieldName = (key: string): string => {
+      // Remove "this." prefix if present
+      let cleaned = key.replace(/^this\./, '')
+      // Convert camelCase to Title Case
+      cleaned = cleaned.replace(/([A-Z])/g, ' $1').trim()
+      // Capitalize first letter
+      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+      return cleaned
     }
 
-    const flattened = flattenObject(extractedData)
-    const csvContent = 'Key,Value\n' + flattened.map(row => `"${row.key}","${row.value}"`).join('\n')
+    // Convert object to flat key-value pairs with clean names
+    const flattenToKeyValue = (obj: any, prefix = ''): Record<string, any> => {
+      const result: Record<string, any> = {}
+      for (const key in obj) {
+        if (obj[key] === null || obj[key] === undefined) continue
+        
+        const cleanKey = prefix ? `${prefix}_${key}` : key
+        const value = obj[key]
+        
+        if (Array.isArray(value) && value.length > 0) {
+          // If array of objects, create separate rows
+          if (typeof value[0] === 'object') {
+            // This will be handled separately
+            continue
+            } else {
+            // Array of primitives - join them
+            result[cleanKey] = value.join('; ')
+            }
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+          // Nested object - flatten it
+          const nested = flattenToKeyValue(value, cleanKey)
+          Object.assign(result, nested)
+        } else {
+          result[cleanKey] = value
+        }
+      }
+      return result
+    }
+
+    // Check if we have an array of objects (like multiple items)
+    const arrayKeys = Object.keys(extractedData).filter(key => 
+      Array.isArray(extractedData[key]) && 
+      extractedData[key].length > 0 && 
+      typeof extractedData[key][0] === 'object'
+    )
+
+    if (arrayKeys.length > 0) {
+      // Handle array of objects - create a table
+      const arrayKey = arrayKeys[0]
+      const items = extractedData[arrayKey]
+      
+      // Get all unique keys from all items
+      const allKeys = new Set<string>()
+      items.forEach((item: any) => {
+        Object.keys(item).forEach(key => allKeys.add(key))
+      })
+      
+      // Create headers
+      const headers = Array.from(allKeys).map(cleanFieldName)
+      const headerRow = headers.join(',')
+      
+      // Create rows
+      const rows = items.map((item: any) => {
+        return Array.from(allKeys).map(key => {
+          const value = item[key]
+          if (value === null || value === undefined) return ''
+          if (typeof value === 'object') return JSON.stringify(value)
+          return String(value).replace(/"/g, '""') // Escape quotes
+        }).map(v => `"${v}"`).join(',')
+      })
+      
+      // Add other fields as metadata at the top
+      let csvContent = ''
+      const otherData = { ...extractedData }
+      delete otherData[arrayKey]
+      
+      if (Object.keys(otherData).length > 0) {
+        const flatOther = flattenToKeyValue(otherData)
+        const otherHeaders = Object.keys(flatOther).map(cleanFieldName)
+        const otherValues = Object.values(flatOther).map(v => 
+          v === null || v === undefined ? '' : String(v).replace(/"/g, '""')
+        )
+        csvContent += otherHeaders.join(',') + '\n'
+        csvContent += otherValues.map(v => `"${v}"`).join(',') + '\n\n'
+      }
+      
+      csvContent += headerRow + '\n'
+      csvContent += rows.join('\n')
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${baseFileName}_extracted.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      return
+    }
+
+    // Single object - create a two-column table (Field, Value)
+    const flatData = flattenToKeyValue(extractedData)
+    const fieldNames = Object.keys(flatData).map(cleanFieldName)
+    const values = Object.values(flatData).map(v => 
+      v === null || v === undefined ? '' : String(v).replace(/"/g, '""')
+    )
+    
+    const csvContent = 'Field,Value\n' + 
+      fieldNames.map((name, i) => `"${name}","${values[i]}"`).join('\n')
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -193,32 +278,127 @@ export default function ExtractedDataViewer({ data, fileName }: ExtractedDataVie
       XLSX.utils.book_append_sheet(workbook, transactionSheet, 'Transactions')
     } else {
       // Generic Excel export for other data types
-      const flattenObject = (obj: any, prefix = ''): any[] => {
-        const rows: any[] = []
-        for (const key in obj) {
-          const value = obj[key]
-          const newKey = prefix ? `${prefix}.${key}` : key
-          if (value && typeof value === 'object' && !Array.isArray(value)) {
-            rows.push(...flattenObject(value, newKey))
-          } else if (Array.isArray(value)) {
-            value.forEach((item, index) => {
-              if (typeof item === 'object') {
-                rows.push(...flattenObject(item, `${newKey}[${index}]`))
-              } else {
-                rows.push({ key: `${newKey}[${index}]`, value: item })
-              }
-            })
-          } else {
-            rows.push({ key: newKey, value: value })
-          }
-        }
-        return rows
+      // Clean field names: remove "this.", convert camelCase to Title Case
+      const cleanFieldName = (key: string): string => {
+        let cleaned = key.replace(/^this\./, '')
+        cleaned = cleaned.replace(/([A-Z])/g, ' $1').trim()
+        cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+        return cleaned
       }
 
-      const flattened = flattenObject(extractedData)
-      const sheetData = [['Key', 'Value'], ...flattened.map(row => [row.key, row.value])]
+      // Convert object to flat key-value pairs with clean names
+      const flattenToKeyValue = (obj: any, prefix = ''): Record<string, any> => {
+        const result: Record<string, any> = {}
+        for (const key in obj) {
+          if (obj[key] === null || obj[key] === undefined) continue
+          
+          const cleanKey = prefix ? `${prefix}_${key}` : key
+          const value = obj[key]
+          
+          if (Array.isArray(value) && value.length > 0) {
+            if (typeof value[0] === 'object') {
+              continue
+              } else {
+              result[cleanKey] = value.join('; ')
+              }
+          } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+            const nested = flattenToKeyValue(value, cleanKey)
+            Object.assign(result, nested)
+          } else {
+            result[cleanKey] = value
+          }
+        }
+        return result
+      }
+
+      // Check if we have an array of objects
+      const arrayKeys = Object.keys(extractedData).filter(key => 
+        Array.isArray(extractedData[key]) && 
+        extractedData[key].length > 0 && 
+        typeof extractedData[key][0] === 'object'
+      )
+
+      if (arrayKeys.length > 0) {
+        // Handle array of objects - create a table
+        const arrayKey = arrayKeys[0]
+        const items = extractedData[arrayKey]
+        
+        // Get all unique keys from all items
+        const allKeys = new Set<string>()
+        items.forEach((item: any) => {
+          Object.keys(item).forEach(key => allKeys.add(key))
+        })
+        
+        // Create headers
+        const headers = Array.from(allKeys).map(cleanFieldName)
+        
+        // Create rows
+        const rows = items.map((item: any) => {
+          return Array.from(allKeys).map(key => {
+            const value = item[key]
+            if (value === null || value === undefined) return ''
+            if (typeof value === 'object') return JSON.stringify(value)
+            return value
+          })
+        })
+        
+        const sheetData = [headers, ...rows]
+        const sheet = XLSX.utils.aoa_to_sheet(sheetData)
+        
+        // Set column widths
+        sheet['!cols'] = headers.map(() => ({ wch: 20 }))
+        
+        // Format header row
+        const headerRange = XLSX.utils.decode_range(sheet['!ref'] || 'A1')
+        for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+          if (!sheet[cellAddress]) continue
+          sheet[cellAddress].s = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: '4472C4' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+          }
+        }
+        
+        XLSX.utils.book_append_sheet(workbook, sheet, 'Data')
+        
+        // Add other fields as a separate sheet if they exist
+        const otherData = { ...extractedData }
+        delete otherData[arrayKey]
+        
+        if (Object.keys(otherData).length > 0) {
+          const flatOther = flattenToKeyValue(otherData)
+          const otherHeaders = Object.keys(flatOther).map(cleanFieldName)
+          const otherValues = Object.values(flatOther)
+          const otherSheetData = [otherHeaders, otherValues]
+          const otherSheet = XLSX.utils.aoa_to_sheet(otherSheetData)
+          otherSheet['!cols'] = [{ wch: 25 }, { wch: 30 }]
+          XLSX.utils.book_append_sheet(workbook, otherSheet, 'Metadata')
+        }
+      } else {
+        // Single object - create a two-column table (Field, Value)
+        const flatData = flattenToKeyValue(extractedData)
+        const fieldNames = Object.keys(flatData).map(cleanFieldName)
+        const values = Object.values(flatData)
+        
+        const sheetData = [['Field', 'Value'], ...fieldNames.map((name, i) => [name, values[i]])]
       const sheet = XLSX.utils.aoa_to_sheet(sheetData)
+        sheet['!cols'] = [{ wch: 25 }, { wch: 30 }]
+        
+        // Format header row
+        const headerRange = XLSX.utils.decode_range(sheet['!ref'] || 'A1')
+        for (let col = headerRange.s.c; col <= headerRange.e.c; col++) {
+          const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
+          if (!sheet[cellAddress]) continue
+          sheet[cellAddress].s = {
+            font: { bold: true },
+            fill: { fgColor: { rgb: '4472C4' } },
+            alignment: { horizontal: 'center', vertical: 'center' }
+          }
+        }
+        
       XLSX.utils.book_append_sheet(workbook, sheet, 'Extracted Data')
+      }
     }
 
     // Download the file

@@ -77,7 +77,7 @@ export default function UserMenu() {
           </div>
           <div className="text-left hidden sm:block">
             <p className="text-sm font-medium text-gray-900 dark:text-white">
-              {userProfile?.full_name || user.email?.split('@')[0]}
+              {userProfile?.full_name || (user.user_metadata?.full_name) || user.email?.split('@')[0] || 'User'}
             </p>
             {userProfile?.subscription_tier === 'pro' && (
               <div className="flex items-center space-x-1">
@@ -97,7 +97,7 @@ export default function UserMenu() {
           <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20">
             <div className="p-4 border-b border-gray-200 dark:border-gray-700">
               <p className="font-semibold text-gray-900 dark:text-white">
-                {userProfile?.full_name || 'User'}
+                {userProfile?.full_name || (user.user_metadata?.full_name) || 'User'}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">{user.email}</p>
             </div>

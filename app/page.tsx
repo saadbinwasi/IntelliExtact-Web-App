@@ -13,10 +13,10 @@ export default function Home() {
     <main className="min-h-screen bg-white dark:bg-gray-900">
       <Navbar />
       <Hero />
+      <HowItWorks />
       <Features />
       <Testimonials />
       <Integrations />
-      <HowItWorks />
       <UseCases />
       <CTA />
       <Footer />

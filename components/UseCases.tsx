@@ -48,7 +48,7 @@ export default function UseCases() {
             Use Cases
           </h2>
           <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            DocuMind adapts to your industry and document processing needs
+            IntelliExtract adapts to your industry and document processing needs
           </p>
         </div>
 
